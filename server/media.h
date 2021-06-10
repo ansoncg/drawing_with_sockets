@@ -12,5 +12,7 @@ size_t get_app_vars_size();
 void server_create_app_vars(void **vars, size_t max_clients); 
 void server_destroy_app_vars(void **vars); 
 size_t serialize(char buffer[4096], void *data, size_t amount); 
+void deserialize(char buffer[4096], void *data, size_t amount); 
+void print_app(void *app); 
 
 #endif

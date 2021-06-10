@@ -9,6 +9,7 @@
 enum {X, Y};
 
 struct app_vars {
+    bool change;
     int new_mouse_position[2], old_mouse_position[2];
     int line_size;
     bool mouse_clicked;
@@ -25,6 +26,7 @@ void create_app_vars(app_vars **vars) {
 }
 
 void init_app_vars(app_vars *vars) {
+    vars->change = false;
     vars->line_size = 15;
     vars->mouse_clicked = false;
     vars->running = false;
@@ -60,6 +62,8 @@ size_t serialize(char buffer[4096], void *data, size_t amount) {
     app_vars *app = data;
 
     for (size_t i = 0; i < amount; i++) {
+        memcpy(buffer + byteoff, &app[i].change, sizeof(bool)); 
+        byteoff += sizeof(bool);
         memcpy(buffer + byteoff, app[i].old_mouse_position, sizeof(int)*2); 
         byteoff += sizeof(int)*2;
         memcpy(buffer + byteoff, app[i].new_mouse_position, sizeof(int)*2); 
@@ -71,7 +75,35 @@ size_t serialize(char buffer[4096], void *data, size_t amount) {
         memcpy(buffer + byteoff, &app[i].running, sizeof(bool)); 
         byteoff += sizeof(bool);
     }
-    printf("%ld\n", byteoff);
     return byteoff;
 }
 
+void deserialize(char buffer[4096], void *data, size_t amount) {
+    size_t byteoff = 0;
+    app_vars *app = data;
+
+    for (size_t i = 0; i < amount; i++) {
+        memcpy(&app[i].change, buffer + byteoff, sizeof(bool)); 
+        byteoff += sizeof(bool);
+        memcpy(app[i].old_mouse_position, buffer + byteoff, sizeof(int)*2); 
+        byteoff += sizeof(int)*2;
+        memcpy(app[i].new_mouse_position, buffer + byteoff, sizeof(int)*2); 
+        byteoff += sizeof(int)*2;
+        memcpy(&app[i].mouse_clicked, buffer + byteoff, sizeof(bool)); 
+        byteoff += sizeof(bool);
+        memcpy(&app[i].line_size, buffer + byteoff, sizeof(int)); 
+        byteoff += sizeof(int);
+        memcpy(&app[i].running, buffer + byteoff, sizeof(bool)); 
+        byteoff += sizeof(bool);
+    }
+    return;
+}
+
+void print_app(void *app) {
+    app_vars *vars = app;
+    printf("%s\n", vars->mouse_clicked ? "CLICKED" : "NOT CLICKED");
+    printf("Old mouse: %d %d\n", vars->old_mouse_position[X], vars->old_mouse_position[Y]);
+    printf("New mouse: %d %d\n", vars->new_mouse_position[X], vars->new_mouse_position[Y]);
+    printf("Line %d\n", vars->line_size);
+    return;
+}

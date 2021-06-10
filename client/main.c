@@ -4,7 +4,7 @@
 #include "network.h"
 #include "media.h"
 
-#define MAX_CLIENTS 1
+#define MAX_CLIENTS 2
 
 int main(void) {
     media *m = NULL;
@@ -12,31 +12,41 @@ int main(void) {
     pthread_t threads[2];
     pthread_attr_t attr;
     pthread_mutex_t lock;
-    pthread_mutex_init(&lock, NULL);
+    pthread_cond_t cond;
 
-    // Create SDL, sockets and threads
+
+    // Create and init SDL
     create_media(&m, MAX_CLIENTS);
+    init_media(m);
+
+    // Create and init sockets
     create_network(&net_vars, MAX_CLIENTS);
-    init_network(net_vars, &lock);
-    set_client_data(net_vars, get_data(m), get_data_size());
+    init_network(net_vars, &lock, &cond);
+
+    // Insert the memory spaces being used by the media on the network module
+    set_app_data(net_vars, get_local_data(m), get_server_data(m), get_data_size());
+
+    // Init mutex and cond 
     pthread_attr_init(&attr);
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+    pthread_mutex_init(&lock, NULL);
+    pthread_cond_init(&cond, NULL);
 
     check_error(connect_to_server(net_vars));
     pthread_create(&threads[0], &attr, sendmessage, net_vars);
     pthread_create(&threads[1], &attr, listener, net_vars);
 
+    //while (is_running(m)) {
     while (is_running(m)) {
         mark_loop_beginning(m);
 
         pthread_mutex_lock(&lock);
-        printf("SDL loop start\n");
-        //get_input(m);
-        draw(m, get_server_data(net_vars));
-        printf("SDL loop end\n");
+        get_input(m);
+        draw(m);
         pthread_mutex_unlock(&lock);
-        mark_loop_duration(m);
 
+        pthread_cond_signal(&cond);
+        mark_loop_duration(m);
         delay_loop(m);
     }
 

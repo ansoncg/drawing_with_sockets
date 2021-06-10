@@ -5,7 +5,7 @@
 #include "network.h"
 
 //TODO erros
-#define MAX_CLIENTS 1
+#define MAX_CLIENTS 2
 
 int main(void) {
     //int error;

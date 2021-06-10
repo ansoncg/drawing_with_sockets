@@ -7,7 +7,7 @@
 #include "media.h"
 
 enum {X, Y};
-#define FPS 60
+#define FPS 60  
 
 typedef struct {
     SDL_Window *window;
@@ -21,6 +21,7 @@ typedef struct {
 } app_consts;
 
 struct app_vars {
+    bool change;
     int new_mouse_position[2], old_mouse_position[2];
     int line_size;
     bool mouse_clicked;
@@ -30,8 +31,8 @@ struct app_vars {
 struct media {
     sdl_vars sdl;  
     app_consts consts; 
-    app_vars *vars;
-    size_t app_vars_size;
+    app_vars *local_vars, *server_vars;
+    size_t max_clients;
 };
 
 void update_mouse_position(SDL_Event event, int mouse_position[2]) {
@@ -40,9 +41,8 @@ void update_mouse_position(SDL_Event event, int mouse_position[2]) {
     return;
 }
 
-//void get_input(app_vars *vars) {
 void get_input(media *m) {
-    app_vars *vars = m->vars;
+    app_vars *vars = (m->local_vars);
     SDL_Event event;
     vars->old_mouse_position[X] = vars->new_mouse_position[X];
     vars->old_mouse_position[Y] = vars->new_mouse_position[Y];
@@ -56,13 +56,22 @@ void get_input(media *m) {
                 break;
             case SDL_MOUSEBUTTONDOWN:
                 vars->mouse_clicked = true;
+                vars->change = true;
                 break;
             case SDL_MOUSEBUTTONUP:
                 vars->mouse_clicked = false;
+                vars->change = false;
                 break;
+            case SDL_KEYDOWN:
+                SDL_SetRenderDrawColor(m->sdl.renderer, 255, 255, 255, 255);
+                if (event.key.keysym.sym == 114) {
+                    SDL_RenderClear(m->sdl.renderer);
+                    printf("apertei\n");
+                }
+                break;
+
             default:
                 vars->old_mouse_position[X] = vars->old_mouse_position[Y] = -1;
-                vars->mouse_clicked = false;
         }
     }
     return;
@@ -70,7 +79,6 @@ void get_input(media *m) {
         
 void mouse_draw(sdl_vars *sdl, app_vars *vars) {
     int lsize = vars->line_size;
-    SDL_SetRenderDrawColor(sdl->renderer, 0, 0, 0, 255);
     if (vars->mouse_clicked) {
         if (vars->old_mouse_position[X] != -1) {
             for (int i = 0; i < lsize; i++)
@@ -80,23 +88,29 @@ void mouse_draw(sdl_vars *sdl, app_vars *vars) {
         else
             SDL_RenderDrawPoint(sdl->renderer, vars->new_mouse_position[X], vars->new_mouse_position[Y]);
     }
-    SDL_SetRenderDrawColor(sdl->renderer, 255, 255, 255, 255);
     return;
 }
 
-void draw(media *m, app_vars *vars) {
-    //SDL_RenderClear(sdl->renderer);
+void draw(media *m) {
+    app_vars *vars = m->server_vars;
+    SDL_SetRenderDrawColor(m->sdl.renderer, 0, 0, 0, 255);
+    mouse_draw(&(m->sdl), (m->local_vars));
+    for (size_t i = 0; i < m->max_clients; i++) {
+        if (vars[i].running) {
+            mouse_draw(&(m->sdl), &vars[i]);
+        }
+    }
+    SDL_SetRenderDrawColor(m->sdl.renderer, 255, 255, 255, 255);
+    SDL_RenderPresent(m->sdl.renderer);
+    return;
+}
+
+void print_app(void *app) {
+    app_vars *vars = app;
     printf("%s\n", vars->mouse_clicked ? "CLICKED" : "NOT CLICKED");
     printf("Old mouse: %d %d\n", vars->old_mouse_position[X], vars->old_mouse_position[Y]);
     printf("New mouse: %d %d\n", vars->new_mouse_position[X], vars->new_mouse_position[Y]);
     printf("Line %d\n", vars->line_size);
-    for (size_t i = 0; i < m->app_vars_size; i++) {
-        if (vars[i].running) {
-            printf("oi %ld\n", i);
-            mouse_draw(&(m->sdl), &vars[i]);
-            SDL_RenderPresent(m->sdl.renderer);
-        }
-    }
     return;
 }
 
@@ -110,7 +124,7 @@ bool init_sdl(sdl_vars *sdl, app_consts *consts) {
     SDL_SetRenderDrawColor(sdl->renderer, 255, 255, 255, 255); 
     sdl->delay = (1000 / FPS);
     SDL_RenderClear(sdl->renderer);
-    printf("SDL certo\n");
+    printf("SDL Init\n");
     return true;
 }
 
@@ -137,8 +151,12 @@ void delay_loop(media *m) {
     return;
 }
 
-void *get_data(media *m) {
-    return m->vars; 
+void *get_local_data(media *m) {
+    return m->local_vars; 
+}
+
+void *get_server_data(media *m) {
+    return m->server_vars;
 }
 
 size_t get_data_size() {
@@ -151,8 +169,10 @@ void create_app_vars(app_vars **vars) {
 }
 
 void init_app_vars(app_vars *vars) {
+    vars->change = false;
     vars->line_size = 15;
     vars->mouse_clicked = false;
+    vars->running = true;
     vars->old_mouse_position[X] = -1;
     vars->old_mouse_position[Y] = -1;
     vars->new_mouse_position[X] = -1;
@@ -185,6 +205,8 @@ size_t serialize(char buffer[4096], void *data, size_t amount) {
     app_vars *app = data;
 
     for (size_t i = 0; i < amount; i++) {
+        memcpy(buffer + byteoff, &app[i].change, sizeof(bool)); 
+        byteoff += sizeof(bool);
         memcpy(buffer + byteoff, app[i].old_mouse_position, sizeof(int)*2); 
         byteoff += sizeof(int)*2;
         memcpy(buffer + byteoff, app[i].new_mouse_position, sizeof(int)*2); 
@@ -196,7 +218,6 @@ size_t serialize(char buffer[4096], void *data, size_t amount) {
         memcpy(buffer + byteoff, &app[i].running, sizeof(bool)); 
         byteoff += sizeof(bool);
     }
-    //printf("%ld\n", byteoff);
     return byteoff;
 }
 
@@ -205,6 +226,8 @@ void deserialize(char buffer[4096], void *data, size_t amount) {
     app_vars *app = data;
 
     for (size_t i = 0; i < amount; i++) {
+        memcpy(&app[i].change, buffer + byteoff, sizeof(bool)); 
+        byteoff += sizeof(bool);
         memcpy(app[i].old_mouse_position, buffer + byteoff, sizeof(int)*2); 
         byteoff += sizeof(int)*2;
         memcpy(app[i].new_mouse_position, buffer + byteoff, sizeof(int)*2); 
@@ -216,26 +239,37 @@ void deserialize(char buffer[4096], void *data, size_t amount) {
         memcpy(&app[i].running, buffer + byteoff, sizeof(bool)); 
         byteoff += sizeof(bool);
     }
+    return;
 }
 
 void create_media(media **m, size_t max_clients) {
     *m = calloc(1, sizeof(media));
-    strcpy((*m)->consts.name, "Drawing with sockets");
-    (*m)->consts.window_hight = 600;
-    (*m)->consts.window_width = 600;
-    client_create_app_vars(&((*m)->vars), max_clients);
-    (*m)->vars->running = init_sdl(&(*m)->sdl, &(*m)->consts);
-    (*m)->app_vars_size = max_clients;
+    (*m)->server_vars = calloc(max_clients, sizeof(app_vars));
+    (*m)->local_vars = calloc(1, sizeof(app_vars));
+    (*m)->max_clients = max_clients;
+    return;
+}
+
+void init_media(media *m) {
+    strcpy(m->consts.name, "Drawing with sockets");
+    m->consts.window_hight = 500;
+    m->consts.window_width = 500;
+    for (size_t i = 0; i < m->max_clients; i++)
+        init_app_vars(&(m->server_vars[i]));
+    init_app_vars((m->local_vars));
+    m->local_vars->running = init_sdl(&(m->sdl), &(m->consts));
     return;
 }
 
 bool is_running(media *m) {
-    return m->vars->running;
+    return m->local_vars->running;
 }
 
 void destroy_media(media **m) {
     destroy_sdl(&(*m)->sdl);
-    free((*m)->vars);
+    free((*m)->server_vars);
+    free((*m)->local_vars);
     free(*m);
+    *m = NULL;
     return;
 }

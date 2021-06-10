@@ -6,6 +6,7 @@
 #include <netinet/in.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <time.h>
 #include "network.h"
 #include "media.h"
 
@@ -34,19 +35,40 @@ void *sendmessage(void *args) {
     printf("%ld client\n", current_client);
     int sock_client = net_vars->clients_sockets[current_client];
     ssize_t bytes_sent;
+    bool to_send = false;
 
+    char *change[net_vars->max_clients];
+    for (size_t i = 0; i < net_vars->max_clients; i++) 
+        change[i] = net_vars->clients_data + i* (data_size / net_vars->max_clients);
+
+    bytes_sent = send(sock_client, net_vars->clients_data, data_size, 0);
     do {
         //pthread_mutex_lock(&(net_vars->lock));
-        //printf("SEND -> CURRENT_CLIENT: %ld\n", current_client);
-        bytes_sent = send(sock_client, net_vars->clients_data, data_size, 0);
-        printf("bytes sent %ld\n", bytes_sent);
+        for (size_t i = 0; i < net_vars->max_clients; i++) 
+            if (*(bool *) change[i]) {
+                (*(bool *) change[i]) = false;
+                to_send = true;
+            }
+        if (to_send) {
+            bytes_sent = send(sock_client, net_vars->clients_data, data_size, 0);
+            to_send = false;
+        }
+
+        /*
+        if (*((bool *) change)) {
+            (*(bool *) change) = false;
+            printf("mudou, enviado\n");
+            bytes_sent = send(sock_client, net_vars->clients_data, data_size, 0);
+            printf("%ld sent\n", bytes_sent);
+        }
+        */
         //pthread_mutex_unlock(&(net_vars->lock));
+        //usleep(100);
     } while (1); // TODO
 
     //close(my_socket);
     pthread_exit(NULL);
 }
-
 
 void *listener(void *args) {
     network_vars *net_vars = (network_vars *) args;
@@ -54,16 +76,14 @@ void *listener(void *args) {
     size_t current_client = net_vars->current_client;
     size_t data_size = net_vars->clients_data_size / net_vars->max_clients;
     ssize_t bytes_received;
-    //pthread_mutex_t *mutexsum = l_args->mutexsum;
-    char *data = net_vars->clients_data + data_size*current_client;
-   
+    char *data = net_vars->clients_data + (data_size*current_client);
+
     do {
         //pthread_mutex_lock(&(net_vars->lock));
         bytes_received = recv(sock_client, data, data_size, 0);
-        printf("bytes received %ld\n", bytes_received);
+        printf("%ld received\n", bytes_received);
         //pthread_mutex_unlock(&(net_vars->lock));
     } while (1);
-    //pthread_mutex_destroy(mutexsum);
     pthread_exit(NULL);
 }
 
