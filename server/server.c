@@ -34,19 +34,27 @@ int main(void) {
     // Read commands until exit
     scanf(" %s", command);
     while (strcmp(command, "exit")) {
-        scanf(" %s", command);
-
+        if (!strcmp(command, "clients")) // Show clients status
+            show_active_clients(net_vars);
+        else if (!strcmp(command, "data")) // Toggle data being sent and received
+            show_data_in_out(net_vars);
+        scanf("%s", command);
     }
+
+    // Stop accepting connections
+    stop_connecting(net_vars);
+    disconnect_all_clients(net_vars);
 
     // Destroy threads
     for (size_t i = 0; i < get_amount_clients(net_vars)*2; i++)
         pthread_join(clients_threads[i], NULL);
+    pthread_join(connection, NULL);
 
     // Destroy application variables
     server_destroy_app_vars(&clients_data);
 
     // Destroy network
-
+    destroy_network(&net_vars);
 
     return EXIT_SUCCESS;
 }

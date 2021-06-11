@@ -12,7 +12,7 @@ FLAGS_FINAL = #-O3 -march=native -w #-funroll-loops
 FLAGS_AVISO = -Wall -Wextra -Wconversion -pedantic
 FLAGS_DEBUG = -ggdb3 -O0
 FLAGS_VALGRIND = --leak-check=full --show-leak-kinds=all --track-origins=yes
-FLAGS_SAN = -fsanitize=thread #-fsanitize=address -fsanitize=undefined
+FLAGS_SAN = -fsanitize=address #-fsanitize=address -fsanitize=undefined
 FLAGS_LIGA = -pthread -lSDL2#-lm
 
 CC = gcc
@@ -41,7 +41,7 @@ run: all
 #--------------
 
 # Sanitize
-s: CFLAGS = $(FLAGS_AVISO) $(FLAGS_DEBUG) -fsanitize=thread#-fsanitize=thread #-fsanitize=undefined
+s: CFLAGS = $(FLAGS_AVISO) $(FLAGS_DEBUG) #-fsanitize=thread #-fsanitize=undefined
 s: $(EXE_S)
 	./$(EXE_S) 
 

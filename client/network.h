@@ -2,6 +2,7 @@
 #define NETWORK_H
 
 #include <stddef.h>
+#include <stdbool.h>
 #include <pthread.h>
 
 typedef struct network_vars network_vars;
@@ -15,5 +16,6 @@ void *listener(void *args);
 void *sendmessage(void *args); 
 int connect_to_server(network_vars *net_vars); 
 void set_app_data(network_vars *net_vars, void *clients_data, void *server_data, size_t data_size); 
+void net_set_running(network_vars *net_vars, bool running); 
 
 #endif

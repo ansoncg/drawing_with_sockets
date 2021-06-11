@@ -12,11 +12,13 @@
 
 #define PORT 25555
 
+// Sockets and threads variables
 struct network_vars {
     int socket; 
     size_t max_clients, data_size; 
     struct sockaddr_in addr;
     void *server_data, *client_data;
+    bool running;
     pthread_mutex_t *lock;
     pthread_cond_t *cond;
 };
@@ -27,8 +29,9 @@ void *sendmessage(void *args) {
     ssize_t bytes_sent;
     size_t buffer_size;
     char buffer[4096];
-    char *change = net_vars->client_data; //TODO do for all
+    char *change = net_vars->client_data; 
     int socket = net_vars->socket;
+    bool running = true;
 
     do {
         pthread_mutex_lock((net_vars->lock));
@@ -38,10 +41,14 @@ void *sendmessage(void *args) {
             printf("Bytes sent %ld\n", bytes_sent);
         }
         pthread_cond_wait(net_vars->cond, net_vars->lock);
+        running = net_vars->running;
         pthread_mutex_unlock((net_vars->lock));
-    } while (1); // TODO
+    } while (running); 
 
-    //close(my_socket);
+    pthread_mutex_lock((net_vars->lock));
+    shutdown(net_vars->socket, SHUT_RDWR); // Kill connection
+    pthread_mutex_unlock((net_vars->lock));
+
     pthread_exit(NULL);
 }
 
@@ -61,11 +68,21 @@ void *listener(void *args) {
         pthread_mutex_lock((net_vars->lock));
         deserialize(buffer, net_vars->server_data, net_vars->max_clients);
         printf("Bytes received %ld\n", bytes_received);
+        if (bytes_received <= 0) {
+            pthread_mutex_unlock((net_vars->lock));
+            break;
+        }
         pthread_cond_wait(net_vars->cond, net_vars->lock);
         pthread_mutex_unlock((net_vars->lock));
     } while (1);
 
+    printf("Disconnected from server\n");
     pthread_exit(NULL);
+}
+
+void net_set_running(network_vars *net_vars, bool running) {
+    net_vars->running = running;
+    return;
 }
 
 void set_app_data(network_vars *net_vars, void *clients_data, void *server_data, size_t data_size) {
@@ -87,6 +104,7 @@ int init_network(network_vars *net_vars, pthread_mutex_t *lock, pthread_cond_t *
     net_vars->addr.sin_addr.s_addr = inet_addr("127.0.0.1");
     net_vars->lock = lock;
     net_vars->cond = cond;
+    net_vars->running = true;
     if ((net_vars->socket = socket(AF_INET, SOCK_STREAM, 0)) == -1)
         return ERROR_SOCKET;
     return OK; 

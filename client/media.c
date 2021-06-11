@@ -9,17 +9,20 @@
 enum {X, Y};
 #define FPS 100  
 
+// SDL variables
 typedef struct {
     SDL_Window *window;
     SDL_Renderer *renderer;
     unsigned int delay, frame_start, frame_duration;
 } sdl_vars;
 
+// Application Constants
 typedef struct {
-    int window_hight, window_width;
+    int window_height, window_width;
     char name[256];
 } app_consts;
 
+// Application Variables
 struct app_vars {
     bool change;
     int new_mouse_position[2], old_mouse_position[2];
@@ -29,6 +32,7 @@ struct app_vars {
     bool running;
 };
 
+// All information necessary to run
 struct media {
     sdl_vars sdl;  
     app_consts consts; 
@@ -129,19 +133,11 @@ void draw(media *m) {
     return;
 }
 
-void print_app(void *app) {
-    app_vars *vars = app;
-    printf("%s\n", vars->mouse_clicked ? "CLICKED" : "NOT CLICKED");
-    printf("Old mouse: %d %d\n", vars->old_mouse_position[X], vars->old_mouse_position[Y]);
-    printf("New mouse: %d %d\n", vars->new_mouse_position[X], vars->new_mouse_position[Y]);
-    printf("Line %d\n", vars->line_size);
-    return;
-}
 
 bool init_sdl(sdl_vars *sdl, app_consts *consts) { 
     if (SDL_Init(SDL_INIT_EVERYTHING))
         return false;
-    if(!(sdl->window = SDL_CreateWindow(consts->name, 0, 0, consts->window_width, consts->window_hight, false))) 
+    if(!(sdl->window = SDL_CreateWindow(consts->name, 0, 0, consts->window_width, consts->window_height, false))) 
         return false;
     if(!(sdl->renderer = SDL_CreateRenderer(sdl->window, -1, SDL_RENDERER_SOFTWARE))) // With flag == 0 I had some problems 
         return false;
@@ -280,9 +276,13 @@ void create_media(media **m, size_t max_clients) {
     return;
 }
 
+bool is_running(media *m) {
+    return m->local_vars->running;
+}
+
 void init_media(media *m) {
     strcpy(m->consts.name, "Drawing with sockets");
-    m->consts.window_hight = 400;
+    m->consts.window_height = 400;
     m->consts.window_width = 400;
     for (size_t i = 0; i < m->max_clients; i++)
         init_app_vars(&(m->server_vars[i]));
@@ -291,15 +291,21 @@ void init_media(media *m) {
     return;
 }
 
-bool is_running(media *m) {
-    return m->local_vars->running;
-}
-
 void destroy_media(media **m) {
     destroy_sdl(&(*m)->sdl);
     free((*m)->server_vars);
     free((*m)->local_vars);
     free(*m);
     *m = NULL;
+    return;
+}
+
+// Debugging
+void print_app(void *app) {
+    app_vars *vars = app;
+    printf("%s\n", vars->mouse_clicked ? "CLICKED" : "NOT CLICKED");
+    printf("Old mouse: %d %d\n", vars->old_mouse_position[X], vars->old_mouse_position[Y]);
+    printf("New mouse: %d %d\n", vars->new_mouse_position[X], vars->new_mouse_position[Y]);
+    printf("Line %d\n", vars->line_size);
     return;
 }

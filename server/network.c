@@ -6,7 +6,6 @@
 #include <netinet/in.h>
 #include <unistd.h>
 #include <pthread.h>
-#include <time.h>
 #include "network.h"
 #include "media.h"
 
@@ -18,10 +17,10 @@ struct network_vars {
     struct sockaddr_in addr;
     char clients_data[4096];
     bool *active_clients;
+    bool show_data;
     pthread_mutex_t lock;
     pthread_t *threads;
     pthread_attr_t *attr;
-    // put command
 };
 
 void set_clients_data(network_vars *net_vars, void *clients_data) {
@@ -58,14 +57,13 @@ void *sendmessage(void *args) {
             }
         if (to_send) {
             bytes_sent = send(sock_client, net_vars->clients_data, data_size, 0);
-            printf("Bytes sent %ld\n", bytes_sent);
+            if (net_vars->show_data)
+                printf("Bytes sent %ld\n", bytes_sent);
             to_send = false;
         }
         active = net_vars->active_clients[current_client];
         pthread_mutex_unlock(&(net_vars->lock)); // UNLOCK
     } while (active);
-
-    //close(my_socket);
     pthread_exit(NULL);
 }
 
@@ -81,9 +79,10 @@ void *listener(void *args) {
     // Listen loop
     do {
         bytes_received = recv(sock_client, buffer, data_size, 0);
-        printf("%ld received\n", bytes_received);
 
         pthread_mutex_lock(&(net_vars->lock)); // LOCK
+        if (net_vars->show_data)
+            printf("Bytes received: %ld\n", bytes_received);
         memcpy(data, buffer, data_size);
         pthread_mutex_unlock(&(net_vars->lock)); // UNLOCK
     } while (bytes_received > 0);
@@ -91,7 +90,6 @@ void *listener(void *args) {
     pthread_mutex_lock(&(net_vars->lock)); // LOCK
     net_vars->active_clients[current_client] = false;
     pthread_mutex_unlock(&(net_vars->lock)); // UNLOCK
-
     pthread_exit(NULL);
 }
 
@@ -116,6 +114,7 @@ int init_network(network_vars *net_vars, pthread_t *threads, pthread_attr_t *att
     net_vars->threads = threads;
     net_vars->attr = attr;
     net_vars->amount_clients = 0;
+    net_vars->show_data = false;
 
     // Init socket
     if ((net_vars->server_socket = socket(AF_INET, SOCK_STREAM, 0)) == -1)
@@ -147,6 +146,11 @@ int accept_connection(network_vars *net_vars, size_t client_id) {
     return OK;
 }
 
+void stop_connecting(network_vars *net_vars) {
+    shutdown(net_vars->server_socket, SHUT_RDWR);
+    return;
+}
+
 void *wait_for_connections(void *args) {
     network_vars *net_vars = args;
     size_t client_id = 0;
@@ -154,8 +158,10 @@ void *wait_for_connections(void *args) {
 
     while (client_id < max_clients) { 
         printf("Waiting\n");
-        check_error(accept_connection(net_vars, client_id));
+        if (check_error(accept_connection(net_vars, client_id)))
+            break;
         printf("Connected client %ld\n", client_id);
+        show_active_clients(net_vars);
         pthread_mutex_lock(&net_vars->lock); // LOCK
         pthread_create(&net_vars->threads[2*client_id], net_vars->attr, sendmessage, net_vars);
         pthread_create(&net_vars->threads[2*client_id + 1], net_vars->attr, listener, net_vars);
@@ -173,10 +179,38 @@ size_t get_amount_clients(network_vars *net_vars) {
     return amount;
 }
 
-void check_error(int error) {
+void show_active_clients(network_vars *net_vars) {
+    pthread_mutex_lock(&net_vars->lock);
+    for (size_t i = 0; i < net_vars->max_clients; i++)
+        printf("CLIENT #%ld: %s\n", i, net_vars->active_clients[i] ? "CONNECTED" : "NOT CONNECTED");
+    pthread_mutex_unlock(&net_vars->lock);
+    return;
+}
+
+void show_data_in_out(network_vars *net_vars) {
+    pthread_mutex_lock(&net_vars->lock);
+    net_vars->show_data = !net_vars->show_data;
+    printf("SHOW DATA: %s\n", net_vars->show_data ? "ON" : "OFF");
+    pthread_mutex_unlock(&net_vars->lock);
+    return; 
+}
+
+void disconnect_all_clients(network_vars *net_vars) {
+    pthread_mutex_lock(&net_vars->lock);
+    for (size_t i = 0; i < net_vars->max_clients; i++) {
+        if (net_vars->active_clients[i]) {
+            shutdown(net_vars->clients_sockets[i], SHUT_RDWR);
+            net_vars->active_clients[i] = false;
+        }
+    }
+    pthread_mutex_unlock(&net_vars->lock);
+    return; 
+}
+
+int check_error(int error) {
     if (error == OK)
-        return;
-    fprintf(stderr, "ERROR ON ");
+        return 0;
+    fprintf(stderr, "FAIL ON ");
     switch (error) {
         case ERROR_SOCKET:
             fprintf(stderr, "SOCKET\n");
@@ -188,12 +222,11 @@ void check_error(int error) {
             fprintf(stderr, "LISTEN\n");
             break;
         case ERROR_ACCEPT:
-            fprintf(stderr, "ACCEPT\n");
+            fprintf(stderr, "ACCEPT or SERVER ENDED\n");
             break;
         case ERROR_CONNECT:
             fprintf(stderr, "CONNECT\n");
             break;
     }
-    exit(1);
-    return;
+    return 1;
 }

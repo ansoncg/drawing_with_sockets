@@ -31,6 +31,7 @@ int main(void) {
     pthread_mutex_init(&lock, NULL);
     pthread_cond_init(&cond, NULL);
 
+    // Connect to server and create threads
     check_error(connect_to_server(net_vars));
     pthread_create(&threads[0], &attr, sendmessage, net_vars);
     pthread_create(&threads[1], &attr, listener, net_vars);
@@ -49,7 +50,19 @@ int main(void) {
         delay_loop(m);
     }
 
-    destroy_media(&m);
+    // End
+    pthread_mutex_lock(&lock); // LOCK
+    net_set_running(net_vars, false);
+    pthread_mutex_unlock(&lock); // UNLOCK
+
+    pthread_cond_signal(&cond); // SIGNAL
+
+    pthread_join(threads[0], NULL);
+    pthread_join(threads[1], NULL);
+
+    //pthread_mutex_lock(&lock); // LOCK
+    //destroy_media(&m);
+    //pthread_mutex_unlock(&lock); // UNLOCK
     destroy_network(&net_vars);
     return EXIT_SUCCESS;
 }
