@@ -9,7 +9,8 @@ SDL2 é necessário para compilar
 make run para executar
 
 <br>
-##Comandos
+
+## Comandos
 
 |Lado|Comando|Efeito|
 |:--:|:-----:|:----:|
