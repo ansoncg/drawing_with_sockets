@@ -71,9 +71,10 @@ void get_input(media *m) {
                 if (event.key.keysym.scancode >= 30 && event.key.keysym.scancode <= 35)
                     m->local_vars->colour = (int) event.key.keysym.scancode - 29;
                 else if (event.key.keysym.scancode == SDL_SCANCODE_Q)
-                    m->local_vars->line_size++;
+                    m->local_vars->line_size += 3;
                 else if (event.key.keysym.scancode == SDL_SCANCODE_W)
-                    m->local_vars->line_size--;
+                    if (m->local_vars->line_size > 3)
+                        m->local_vars->line_size -= 3;
                 break;
             default:
                 vars->old_mouse_position[X] = vars->old_mouse_position[Y] = -1;
