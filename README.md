@@ -8,4 +8,4 @@ SDL2 é necessário para compilar
 
 make run para executar
 
-![gif](gifdotgif.gif)/![](gifdotgif.gif)
+![gif](gifdotgif.gif)
