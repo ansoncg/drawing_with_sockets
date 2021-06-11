@@ -1,50 +1,52 @@
 #include <stdio.h>
+#include <string.h>
 #include <stdlib.h>
 #include <pthread.h>
 #include "media.h"
 #include "network.h"
 
-//TODO erros
-#define MAX_CLIENTS 2
+#define MAX_CLIENTS 3
+
 
 int main(void) {
-    //int error;
-    size_t client_id = 0;
-    void *clients_data = NULL; // Clients application varibles 
+    void *clients_data = NULL; // Clients application variables 
     network_vars *net_vars = NULL; // Network information
-    pthread_t threads[MAX_CLIENTS*2];
     pthread_attr_t attr;
-    //pthread_key_t thread_key;
+    pthread_t connection;
+    pthread_t clients_threads[MAX_CLIENTS*2];
+    char command[500];
 
-    // Create and init application varibles for all clients
+    // Create and init application variables for all clients
     server_create_app_vars(&clients_data, MAX_CLIENTS);
 
-    // Create and init network varibles
-    create_network(&net_vars, MAX_CLIENTS); 
-    check_error(init_network(net_vars));
-    set_clients_data(net_vars, clients_data);
-
-    // Create and init threads
+    // Init attr and connection thread
     pthread_attr_init(&attr);
-    //pthread_key_create(&thread_key, NULL);
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 
-    while (1) { //TODO criar condição de termino
-        printf("Waiting\n");
-        check_error(accept_connection(net_vars, client_id));
-        printf("Connected client %ld\n", client_id);
-        pthread_create(&threads[client_id], &attr, sendmessage, net_vars);
-        pthread_create(&threads[client_id + 1], &attr, listener, net_vars);
-        client_id++;
+    // Create and init network variables
+    create_network(&net_vars, MAX_CLIENTS); 
+    check_error(init_network(net_vars, clients_threads, &attr));
+    set_clients_data(net_vars, clients_data);
+
+    // Start waiting for connections
+    pthread_create(&connection, &attr, wait_for_connections, net_vars);
+
+    // Read commands until exit
+    scanf(" %s", command);
+    while (strcmp(command, "exit")) {
+        scanf(" %s", command);
+
     }
 
-    // Destroy application varibles
+    // Destroy threads
+    for (size_t i = 0; i < get_amount_clients(net_vars)*2; i++)
+        pthread_join(clients_threads[i], NULL);
+
+    // Destroy application variables
     server_destroy_app_vars(&clients_data);
 
     // Destroy network
 
-
-    // Destroy threads
 
     return EXIT_SUCCESS;
 }

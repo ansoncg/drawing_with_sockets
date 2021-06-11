@@ -31,13 +31,11 @@ void *sendmessage(void *args) {
     int socket = net_vars->socket;
 
     do {
-
         pthread_mutex_lock((net_vars->lock));
         if (*(bool *) change) {
-            //printf("mudou\n");
             buffer_size = serialize(buffer, net_vars->client_data, 1);
             bytes_sent = send(socket, buffer, buffer_size, 0);
-            printf("bytes sent %ld\n", bytes_sent);
+            printf("Bytes sent %ld\n", bytes_sent);
         }
         pthread_cond_wait(net_vars->cond, net_vars->lock);
         pthread_mutex_unlock((net_vars->lock));
@@ -51,23 +49,22 @@ void *listener(void *args) {
     network_vars *net_vars = (network_vars *) args;
     ssize_t bytes_received;
     size_t buffer_size;
-    //size_t data_size = net_vars->max_clients * net_vars->data_size;
     char buffer[4096];
     int socket = net_vars->socket;
 
     pthread_mutex_lock((net_vars->lock));
     buffer_size = serialize(buffer, net_vars->server_data, net_vars->max_clients); 
     pthread_mutex_unlock((net_vars->lock));
+
     do {
         bytes_received = recv(socket, buffer, buffer_size, 0);
         pthread_mutex_lock((net_vars->lock));
         deserialize(buffer, net_vars->server_data, net_vars->max_clients);
-        //getchar();
-        //printf("Ended listen\n");
-        printf("bytes received %ld\n", bytes_received);
+        printf("Bytes received %ld\n", bytes_received);
         pthread_cond_wait(net_vars->cond, net_vars->lock);
         pthread_mutex_unlock((net_vars->lock));
     } while (1);
+
     pthread_exit(NULL);
 }
 
@@ -100,6 +97,13 @@ void destroy_network(network_vars **net_vars) {
     return;
 }
 
+int connect_to_server(network_vars *net_vars) {
+    if (connect(net_vars->socket, (struct sockaddr *) &(net_vars->addr), sizeof(net_vars->addr)) == -1) 
+        return ERROR_CONNECT;
+    printf("Connected to server\n");
+    return OK;
+}
+
 void check_error(int error) {
     if (error == OK)
         return;
@@ -122,57 +126,4 @@ void check_error(int error) {
             break;
     }
     exit(1);
-    return;
 }
-
-int connect_to_server(network_vars *net_vars) {
-    if (connect(net_vars->socket, (struct sockaddr *) &(net_vars->addr), sizeof(net_vars->addr)) == -1) 
-        return ERROR_CONNECT;
-    printf("Connected to server\n");
-    return OK;
-}
-
-/*
-   int main(void) {
-   int my_socket; 
-   struct sockaddr_in addr = {
-   .sin_family = AF_INET,
-   .sin_port = htons(PORT),
-   .sin_addr.s_addr = inet_addr("127.0.0.1")
-   }; // Struct initialization initialize the rest with 0.
-   pthread_mutex_t mutexsum = PTHREAD_MUTEX_INITIALIZER;
-   pthread_t threads[2];
-   pthread_attr_t attr;
-
-   if ((my_socket = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-   fprintf(stderr, "Error on socket - client\n");
-   return EXIT_FAILURE;
-   }
-
-   printf("Trying to connect...\n");
-
-   if (connect(my_socket, (struct sockaddr *) &addr, sizeof(addr)) == -1) {
-   fprintf(stderr, "Error on connect.\n");
-   return EXIT_FAILURE;
-   }
-
-   printf("Connected.\n");
-
-   sendmessage_args s_args = {.my_socket = my_socket, .mutexsum = &mutexsum};
-   listener_args l_args = {.my_socket = my_socket};
-
-// Threads
-pthread_attr_init(&attr);
-pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-pthread_create(&threads[0], &attr, sendmessage, &s_args);
-pthread_create(&threads[1], &attr, listener, &l_args);
-
-//while (running) { 
-
-//}
-pthread_exit(NULL);
-
-//close(my_socket); 
-return EXIT_SUCCESS;
-}
-*/

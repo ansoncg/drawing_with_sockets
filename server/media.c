@@ -14,6 +14,7 @@ struct app_vars {
     int line_size;
     bool mouse_clicked;
     bool running;
+    int colour;
 };
 
 size_t get_app_vars_size() {
@@ -34,6 +35,7 @@ void init_app_vars(app_vars *vars) {
     vars->old_mouse_position[Y] = -1;
     vars->new_mouse_position[X] = -1;
     vars->new_mouse_position[Y] = -1;
+    vars->colour = 1;
     return;
 }
 
@@ -74,6 +76,8 @@ size_t serialize(char buffer[4096], void *data, size_t amount) {
         byteoff += sizeof(int);
         memcpy(buffer + byteoff, &app[i].running, sizeof(bool)); 
         byteoff += sizeof(bool);
+        memcpy(buffer + byteoff, &app[i].colour, sizeof(bool)); 
+        byteoff += sizeof(int);
     }
     return byteoff;
 }
@@ -95,6 +99,8 @@ void deserialize(char buffer[4096], void *data, size_t amount) {
         byteoff += sizeof(int);
         memcpy(&app[i].running, buffer + byteoff, sizeof(bool)); 
         byteoff += sizeof(bool);
+        memcpy(&app[i].colour, buffer + byteoff, sizeof(bool)); 
+        byteoff += sizeof(int);
     }
     return;
 }

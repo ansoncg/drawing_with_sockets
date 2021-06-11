@@ -7,7 +7,7 @@
 #include "media.h"
 
 enum {X, Y};
-#define FPS 60  
+#define FPS 100  
 
 typedef struct {
     SDL_Window *window;
@@ -24,6 +24,7 @@ struct app_vars {
     bool change;
     int new_mouse_position[2], old_mouse_position[2];
     int line_size;
+    int colour;
     bool mouse_clicked;
     bool running;
 };
@@ -63,13 +64,13 @@ void get_input(media *m) {
                 vars->change = false;
                 break;
             case SDL_KEYDOWN:
-                SDL_SetRenderDrawColor(m->sdl.renderer, 255, 255, 255, 255);
-                if (event.key.keysym.sym == 114) {
-                    SDL_RenderClear(m->sdl.renderer);
-                    printf("apertei\n");
-                }
+                if (event.key.keysym.scancode >= 30 && event.key.keysym.scancode <= 35)
+                    m->local_vars->colour = (int) event.key.keysym.scancode - 29;
+                else if (event.key.keysym.scancode == SDL_SCANCODE_Q)
+                    m->local_vars->line_size++;
+                else if (event.key.keysym.scancode == SDL_SCANCODE_W)
+                    m->local_vars->line_size--;
                 break;
-
             default:
                 vars->old_mouse_position[X] = vars->old_mouse_position[Y] = -1;
         }
@@ -77,10 +78,31 @@ void get_input(media *m) {
     return;
 }
         
+void set_colour(sdl_vars *sdl, app_vars *vars) {
+    switch (vars->colour) {
+        case 1:
+            SDL_SetRenderDrawColor(sdl->renderer, 0, 0, 0, 255);
+            break;
+        case 2:
+            SDL_SetRenderDrawColor(sdl->renderer, 255, 0, 0, 255);
+            break;
+        case 3:
+            SDL_SetRenderDrawColor(sdl->renderer, 0, 255, 0, 255);
+            break;
+        case 4:
+            SDL_SetRenderDrawColor(sdl->renderer, 0, 0, 255, 255);
+            break;
+        case 5:
+            SDL_SetRenderDrawColor(sdl->renderer, 255, 255, 255, 255);
+            break;
+    }
+}
+
 void mouse_draw(sdl_vars *sdl, app_vars *vars) {
     int lsize = vars->line_size;
     if (vars->mouse_clicked) {
         if (vars->old_mouse_position[X] != -1) {
+            set_colour(sdl, vars);
             for (int i = 0; i < lsize; i++)
                 for (int j = 0; j < lsize; j++)
                     SDL_RenderDrawLine(sdl->renderer, vars->old_mouse_position[X] + i, vars->old_mouse_position[Y] + j, vars->new_mouse_position[X] + i, vars->new_mouse_position[Y] + j);
@@ -93,14 +115,16 @@ void mouse_draw(sdl_vars *sdl, app_vars *vars) {
 
 void draw(media *m) {
     app_vars *vars = m->server_vars;
-    SDL_SetRenderDrawColor(m->sdl.renderer, 0, 0, 0, 255);
-    mouse_draw(&(m->sdl), (m->local_vars));
+
+    // Local drawing
+    //mouse_draw(&(m->sdl), (m->local_vars));
+
+    // Drawing from the server
     for (size_t i = 0; i < m->max_clients; i++) {
         if (vars[i].running) {
             mouse_draw(&(m->sdl), &vars[i]);
         }
     }
-    SDL_SetRenderDrawColor(m->sdl.renderer, 255, 255, 255, 255);
     SDL_RenderPresent(m->sdl.renderer);
     return;
 }
@@ -119,11 +143,12 @@ bool init_sdl(sdl_vars *sdl, app_consts *consts) {
         return false;
     if(!(sdl->window = SDL_CreateWindow(consts->name, 0, 0, consts->window_width, consts->window_hight, false))) 
         return false;
-    if(!(sdl->renderer = SDL_CreateRenderer(sdl->window, -1, 0))) 
+    if(!(sdl->renderer = SDL_CreateRenderer(sdl->window, -1, SDL_RENDERER_SOFTWARE))) // With flag == 0 I had some problems 
         return false;
     SDL_SetRenderDrawColor(sdl->renderer, 255, 255, 255, 255); 
     sdl->delay = (1000 / FPS);
     SDL_RenderClear(sdl->renderer);
+    SDL_SetRenderDrawColor(sdl->renderer, 0, 0, 0, 255);
     printf("SDL Init\n");
     return true;
 }
@@ -177,6 +202,7 @@ void init_app_vars(app_vars *vars) {
     vars->old_mouse_position[Y] = -1;
     vars->new_mouse_position[X] = -1;
     vars->new_mouse_position[Y] = -1;
+    vars->colour = 1;
     return;
 }
 
@@ -217,6 +243,8 @@ size_t serialize(char buffer[4096], void *data, size_t amount) {
         byteoff += sizeof(int);
         memcpy(buffer + byteoff, &app[i].running, sizeof(bool)); 
         byteoff += sizeof(bool);
+        memcpy(buffer + byteoff, &app[i].colour, sizeof(bool)); 
+        byteoff += sizeof(int);
     }
     return byteoff;
 }
@@ -238,6 +266,8 @@ void deserialize(char buffer[4096], void *data, size_t amount) {
         byteoff += sizeof(int);
         memcpy(&app[i].running, buffer + byteoff, sizeof(bool)); 
         byteoff += sizeof(bool);
+        memcpy(&app[i].colour, buffer + byteoff, sizeof(bool)); 
+        byteoff += sizeof(int);
     }
     return;
 }
@@ -252,8 +282,8 @@ void create_media(media **m, size_t max_clients) {
 
 void init_media(media *m) {
     strcpy(m->consts.name, "Drawing with sockets");
-    m->consts.window_hight = 500;
-    m->consts.window_width = 500;
+    m->consts.window_hight = 400;
+    m->consts.window_width = 400;
     for (size_t i = 0; i < m->max_clients; i++)
         init_app_vars(&(m->server_vars[i]));
     init_app_vars((m->local_vars));

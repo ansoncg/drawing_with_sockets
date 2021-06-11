@@ -4,7 +4,7 @@
 #include "network.h"
 #include "media.h"
 
-#define MAX_CLIENTS 2
+#define MAX_CLIENTS 3
 
 int main(void) {
     media *m = NULL;
@@ -13,7 +13,6 @@ int main(void) {
     pthread_attr_t attr;
     pthread_mutex_t lock;
     pthread_cond_t cond;
-
 
     // Create and init SDL
     create_media(&m, MAX_CLIENTS);
@@ -36,16 +35,16 @@ int main(void) {
     pthread_create(&threads[0], &attr, sendmessage, net_vars);
     pthread_create(&threads[1], &attr, listener, net_vars);
 
-    //while (is_running(m)) {
+    // Main loop
     while (is_running(m)) {
         mark_loop_beginning(m);
 
-        pthread_mutex_lock(&lock);
+        pthread_mutex_lock(&lock); // LOCK
         get_input(m);
         draw(m);
-        pthread_mutex_unlock(&lock);
+        pthread_mutex_unlock(&lock); // UNLOCK
 
-        pthread_cond_signal(&cond);
+        pthread_cond_signal(&cond); // SIGNAL
         mark_loop_duration(m);
         delay_loop(m);
     }
